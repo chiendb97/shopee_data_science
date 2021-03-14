@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fairseq.data import Dictionary
 from fairseq.data.encoders.fastbpe import fastBPE
-from sklearn.metrics import f1_score, roc_auc_score, accuracy_score
+from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, precision_recall_fscore_support
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from tqdm import tqdm
 from transformers import RobertaConfig, get_constant_schedule, get_linear_schedule_with_warmup
@@ -131,7 +131,7 @@ def main():
 
         for i, (x_batch, y_batch) in pbar:
             mask = (x_batch > 0)
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=(x_batch > 0).cuda())
+            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=(x_batch > 0).cuda(), labels=y_batch)
             y_pred = torch.argmax(y_hat, 2)
             output += y_batch[mask].detach().cpu().numpy().tolist()
             pred += y_pred[mask].detach().cpu().numpy().tolist()
@@ -140,8 +140,13 @@ def main():
             avg_loss += loss.item() / len(train_loader)
 
         score = accuracy_score(output, pred)
+        precision, recall, f1_score, support = precision_recall_fscore_support(output, pred)
         print(f"\nValid avg loss = {avg_loss:.4f}")
         print(f"\nValid accuracy score = {score:.4f}")
+        print(f"\nPrecision:", precision)
+        print(f"\nRecall:", recall)
+        print(f"\nF1 score:", f1_score)
+        print(f"\nSupport:", support)
         if score >= best_score:
             torch.save(model_bert.state_dict(), os.path.join(args.ckpt_path, f"model.bin"))
             best_score = score
