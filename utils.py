@@ -93,7 +93,6 @@ def convert_lines(data, tokenizer, max_sequence_length):
 
             if (lbl_raw[k] == 1 or lbl_raw[k] == 3) and not word.startswith("Ġ"):
                 lbl[i] = lbl_raw[k] + 1
-
             else:
                 lbl[i] = lbl_raw[k]
 

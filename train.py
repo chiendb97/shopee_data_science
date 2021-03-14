@@ -107,7 +107,8 @@ def main():
         model_bert.train()
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
         for i, (x_batch, y_batch) in pbar:
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=(x_batch > 0).cuda(), labels=y_batch)
+            mask = (x_batch != 1)
+            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
             loss.backward()
             if i % args.accumulation_steps == 0 or i == len(pbar) - 1:
                 optimizer.step()
@@ -130,8 +131,8 @@ def main():
         avg_loss = 0.
 
         for i, (x_batch, y_batch) in pbar:
-            mask = (x_batch > 0)
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=(x_batch > 0).cuda(), labels=y_batch)
+            mask = (x_batch != 1)
+            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
             y_pred = torch.argmax(y_hat, 2)
             output += y_batch[mask].detach().cpu().numpy().tolist()
             pred += y_pred[mask].detach().cpu().numpy().tolist()
