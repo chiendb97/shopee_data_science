@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--max_sequence_length', type=int, default=256)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--accumulation_steps', type=int, default=5)
-    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--fold', type=int, default=0)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--lr', type=float, default=3e-5)
@@ -82,7 +82,6 @@ def main():
     if not os.path.exists(args.ckpt_path):
         os.mkdir(args.ckpt_path)
 
-    tq = tqdm(range(args.epochs + 1))
     for child in tsfm.children():
         for param in child.parameters():
             if not param.requires_grad:
@@ -92,8 +91,7 @@ def main():
     frozen = True
     best_score = 0.
 
-    for epoch in tq:
-
+    for epoch in range(args.epochs):
         if epoch > 0 and frozen:
             for child in tsfm.children():
                 for param in child.parameters():
@@ -122,21 +120,28 @@ def main():
             pbar.set_postfix(loss=lossf)
             avg_loss += loss.item() / len(train_loader)
 
-        print(f"\nAvg loss = {avg_loss:.4f}")
+        print("------------------------------- Training epoch {} ----------------------------".format(epoch + 1))
+        print(f"\nTrain avg loss = {avg_loss:.4f}")
 
         model_bert.eval()
         pbar = tqdm(enumerate(valid_loader), total=len(valid_loader), leave=False)
         output = []
         pred = []
+        avg_loss = 0.
+
         for i, (x_batch, y_batch) in pbar:
             mask = (x_batch > 0)
             y_hat, loss = model_bert(x_batch.cuda(), attention_mask=(x_batch > 0).cuda())
             y_pred = torch.argmax(y_hat, 2)
             output += y_batch[mask].detach().cpu().numpy().tolist()
             pred += y_pred[mask].detach().cpu().numpy().tolist()
+            lossf = loss.item()
+            pbar.set_postfix(loss=lossf)
+            avg_loss += loss.item() / len(train_loader)
 
         score = accuracy_score(output, pred)
-        print(f"\nAccuracy score = {score:.4f}")
+        print(f"\nValid avg loss = {avg_loss:.4f}")
+        print(f"\nValid accuracy score = {score:.4f}")
         if score >= best_score:
             torch.save(model_bert.state_dict(), os.path.join(args.ckpt_path, f"model.bin"))
             best_score = score
