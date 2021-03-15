@@ -55,7 +55,7 @@ def main():
     data_train = read_data(args.train_path)
     x_train, y_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
 
-    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train)
+    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
                                                    torch.tensor(y_train, dtype=torch.long))
@@ -132,13 +132,15 @@ def main():
 
         for i, (x_batch, y_batch) in pbar:
             mask = (x_batch != 1)
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
+            with torch.no_grad():
+                y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
+
             y_pred = torch.argmax(y_hat, 2)
             output += y_batch[mask].detach().cpu().numpy().tolist()
             pred += y_pred[mask].detach().cpu().numpy().tolist()
             lossf = loss.item()
             pbar.set_postfix(loss=lossf)
-            avg_loss += loss.item() / len(train_loader)
+            avg_loss += loss.item() / len(valid_loader)
 
         score = accuracy_score(output, pred)
         precision, recall, f1_score, support = precision_recall_fscore_support(output, pred)
