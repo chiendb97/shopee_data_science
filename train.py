@@ -21,11 +21,10 @@ def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--train_path', type=str, default='./data/train.csv')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
-    parser.add_argument('--max_sequence_length', type=int, default=256)
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--max_sequence_length', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--accumulation_steps', type=int, default=5)
     parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--fold', type=int, default=0)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('--ckpt_path', type=str, default='./models')
@@ -43,7 +42,7 @@ def main():
     )
 
     model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config)
-    model_bert.cuda()
+    # model_bert.cuda()
 
     if torch.cuda.device_count():
         print(f"Training using {torch.cuda.device_count()} gpus")
@@ -152,7 +151,7 @@ def main():
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
         if score >= best_score:
-            torch.save(os.path.join(args.ckpt_path, f"model.pt"))
+            torch.save(model_bert, os.path.join(args.ckpt_path, "model.pt"))
             best_score = score
 
 
