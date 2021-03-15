@@ -53,6 +53,7 @@ def main():
         tsfm = model_bert.roberta
 
     data_train = read_data(args.train_path)
+
     x_train, y_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
 
     x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2)
@@ -151,7 +152,7 @@ def main():
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
         if score >= best_score:
-            torch.save(model_bert.state_dict(), os.path.join(args.ckpt_path, f"model.bin"))
+            torch.save(os.path.join(args.ckpt_path, f"model.pt"))
             best_score = score
 
 

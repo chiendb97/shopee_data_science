@@ -12,7 +12,7 @@ from utils import format_punctuatation, seed_everything
 
 
 def read_csv(path):
-    df = pd.read_csv(path)
+    df = pd.read_csv(path).head(100)
     data = []
     for idx, text in df.values.tolist():
         data.append(text)
@@ -28,8 +28,7 @@ def text_to_index(data, tokenizer, max_sequence_length):
     subwords = []
     index = np.zeros((len(data), max_sequence_length))
     for idx, address in tqdm(enumerate(data), total=len(data)):
-        address = format_punctuatation(address)
-        address_word = address.split()
+        address_word = format_punctuatation(address)
         address = " " + " ".join(address_word)
         input_ids = tokenizer(address)['input_ids']
         subwords = tokenizer.convert_ids_to_tokens(input_ids)
@@ -40,7 +39,7 @@ def text_to_index(data, tokenizer, max_sequence_length):
         else:
             input_ids = input_ids + [pad_id, ] * (max_sequence_length - len(input_ids))
 
-        index[idx, :] = np.array(input_ids)
+        index[idx, :] = np.array(input_ids, dtype=np.long)
         subwords.append(subwords)
 
     return index, subwords
@@ -59,33 +58,27 @@ def main():
 
     seed_everything(69)
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
-    config = RobertaConfig.from_pretrained(
-        args.model_name,
-        output_hidden_states=True,
-        num_labels=5
-    )
-    model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config)
-    model_bert.load_state_dict(torch.load(os.path.join(args.ckpt_path, f"model.bin")))
-    model_bert.cuda()
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model_bert = torch.load(os.path.join(args.ckpt_path, f"model.bin"))
     data = read_csv(args.test_path)
     index, subwords = text_to_index(data, tokenizer, args.max_sequence_length)
 
-    test_dataset = torch.utils.data.TensorDataset(torch.tensor(index, dtype=torch.long))
+    test_dataset = torch.utils.data.TensorDataset((torch.tensor(index, dtype=torch.long)))
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model_bert.eval()
+
     pred = []
     pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
-    for i, x_batch in pbar:
+    for i, (x_batch,) in pbar:
         mask = (x_batch != 1)
         with torch.no_grad():
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda())
+            y_hat = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         y_pred = torch.argmax(y_hat, 2)
         pred += y_pred.detach().cpu().numpy().tolist()
-
-    print(pred)
 
 
 if __name__ == '__main__':

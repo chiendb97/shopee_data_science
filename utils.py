@@ -109,8 +109,8 @@ def convert_lines(data, tokenizer, max_sequence_length):
             input_ids = input_ids + [pad_id, ] * (max_sequence_length - len(input_ids))
             lbl = lbl + [0, ] * (max_sequence_length - len(lbl))
 
-        index[idx, :] = np.array(input_ids)
-        label[idx, :] = np.array(lbl)
+        index[idx, :] = np.array(input_ids, dtype=np.long)
+        label[idx, :] = np.array(lbl, dtype=np.long)
 
     return index, label
 
@@ -156,6 +156,3 @@ def seed_everything(SEED):
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-
-if __name__ == '__main__':
-    read_data("/home/local/Downloads/train.csv")
