@@ -95,11 +95,11 @@ def sufprocess(dict_acronyms, data, subwords, preds):
         poi, street = "", ""
         if poi_start >= 0:
             poi = add_to_label(address, poi_start, poi_end).strip()
-            poi = handle_acronyms(dict_acronyms, poi)
+            # poi = handle_acronyms(dict_acronyms, poi)
 
         if street_start >= 0:
             street = add_to_label(address, street_start, street_end).strip()
-            street = handle_acronyms(dict_acronyms, street)
+            # street = handle_acronyms(dict_acronyms, street)
 
         label.append(poi + "/" + street)
 
@@ -122,8 +122,8 @@ def main():
     parser.add_argument('--test_path', type=str, default='./data/test.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
-    parser.add_argument('--max_sequence_length', type=int, default=64)
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--max_sequence_length', type=int, default=128)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--ckpt_path', type=str, default='./models')
 

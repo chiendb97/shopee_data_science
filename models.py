@@ -13,7 +13,7 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         self.num_labels = config.num_labels
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.classifier = nn.Linear(4 * config.hidden_size, config.num_labels)
 
         self.init_weights()
 
@@ -48,7 +48,9 @@ class RobertaForTokenClassification(BertPreTrainedModel):
             return_dict=return_dict,
         )
 
-        sequence_output = outputs[0]
+        # sequence_output = outputs[0]
+        sequence_output = torch.cat((outputs[2][-1], outputs[2][-2], outputs[2][-3],
+                                     outputs[2][-4]), -1)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -68,4 +70,3 @@ class RobertaForTokenClassification(BertPreTrainedModel):
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         return (logits, loss) if loss is not None else logits
-
