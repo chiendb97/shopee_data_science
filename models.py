@@ -49,8 +49,8 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         )
 
         # sequence_output = outputs[0]
-        sequence_output = torch.cat((outputs[2][-1], outputs[2][-2], outputs[2][-3],
-                                     outputs[2][-4]), -1)
+        sequence_output = torch.cat((outputs[1][-1], outputs[1][-2], outputs[1][-3],
+                                     outputs[1][-4]), -1)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
