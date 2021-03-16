@@ -40,7 +40,7 @@ def main():
     )
 
     model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config)
-    # model_bert.cuda()
+    model_bert.cuda()
 
     if torch.cuda.device_count():
         print(f"Training using {torch.cuda.device_count()} gpus")

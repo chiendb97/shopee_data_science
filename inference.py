@@ -1,6 +1,5 @@
 import argparse
 import os
-
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -13,8 +12,8 @@ from utils import format_punctuatation, seed_everything
 def read_csv(path):
     df = pd.read_csv(path).head(128)
     data = []
-    for idx, text in df.values.tolist():
-        data.append(text)
+    for idx, address in df.values.tolist():
+        data.append(address)
 
     return data
 
@@ -86,8 +85,7 @@ def sufprocess(data, subwords, preds):
 
         index.append(idx)
 
-        poi = ""
-        street = ""
+        poi, street = "", ""
         if poi_start >= 0:
             poi = address[poi_start: poi_end].strip()
 
@@ -105,7 +103,7 @@ def sufprocess(data, subwords, preds):
         #     print("street:", address[street_start: street_end])
         #
         # print("------------------------------------------------------")
-    
+
     df = pd.DataFrame(data={'id': index, 'POI/street': label})
     df.to_csv("data/submission.csv", index=False)
 

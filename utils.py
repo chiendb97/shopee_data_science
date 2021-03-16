@@ -8,11 +8,10 @@ from tqdm import tqdm
 
 
 def format_punctuatation(text):
-    punct = string.punctuation.replace("-", "")
+    punct = string.punctuation.translate(str.maketrans('', '', "-'"))
     for ch in punct:
         text = text.replace(ch, " " + ch + " ")
 
-    text = re.sub('\s{2,}', ' ', text)
     return text.strip().split()
 
 
@@ -29,16 +28,16 @@ def remove_punct(words):
 
 def check_semilar(source, target):
     for i in range(len(source)):
-        source_rm_punct = source[i].translate(str.maketrans('', '', '.,'))
-        target_rm_punct = target[i].translate(str.maketrans('', '', '.,'))
+        # source_rm_punct = source[i].translate(str.maketrans('', '', '.,'))
+        # target_rm_punct = target[i].translate(str.maketrans('', '', '.,'))
 
-        if not target_rm_punct.startswith(source_rm_punct):
+        if not target[i].startswith(source[i]):
             return False
 
     return True
 
 
-def preprocess(text_word, label_word):
+def preprocess(text_word, label_word, pre_start=-1, pre_end=-1):
     new_text_word, new2old_text = remove_punct(text_word)
     new_label_word, new2old_label = remove_punct(label_word)
     if len(new_text_word) * len(new_label_word) == 0:
@@ -47,9 +46,14 @@ def preprocess(text_word, label_word):
     start, end = -1, -1
     max_ratio = 0
     for i in range(0, len(new_text_word) - len(new_label_word) + 1):
+
         if check_semilar(new_text_word[i: i + len(new_label_word)], new_label_word):
-            ratio = SequenceMatcher(" ".join(new_text_word[i: i + len(new_label_word)]),
+            ratio = SequenceMatcher(None, " ".join(new_text_word[i: i + len(new_label_word)]),
                                     " ".join(new_label_word)).ratio()
+
+            if not (pre_end <= new2old_text[i] or new2old_text[i + len(new_label_word) - 1] + 1 <= pre_start):
+                continue
+
             if ratio >= max_ratio:
                 max_ratio = ratio
                 start = new2old_text[i]
@@ -127,15 +131,26 @@ def read_data(path):
         poi_start, poi_end = -1, -1
         street_start, street_end = -1, -1
 
-        if street:
-            street_start, street_end = preprocess(raw_address, street)
-            if street_start == -1:
-                continue
+        if len(street) >= len(poi):
+            if street:
+                street_start, street_end = preprocess(raw_address, street)
+                if street_start == -1:
+                    continue
 
-        if poi:
-            poi_start, poi_end = preprocess(raw_address, poi)
-            if poi_start == -1:
-                continue
+            if poi:
+                poi_start, poi_end = preprocess(raw_address, poi, street_start, street_end)
+                if poi_start == -1:
+                    continue
+        else:
+            if poi:
+                poi_start, poi_end = preprocess(raw_address, poi)
+                if poi_start == -1:
+                    continue
+
+            if street:
+                street_start, street_end = preprocess(raw_address, street, poi_start, poi_end)
+                if street_start == -1:
+                    continue
 
         if street_start >= 0 and poi_start >= 0 and not (poi_end <= street_start or street_end <= poi_start):
             continue
@@ -155,4 +170,3 @@ def seed_everything(SEED):
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
