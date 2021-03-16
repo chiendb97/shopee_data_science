@@ -7,6 +7,53 @@ from difflib import SequenceMatcher
 from tqdm import tqdm
 
 
+def split_text(text):
+    result = []
+    punct = string.punctuation.translate(str.maketrans('', '', "-'"))
+    word = ""
+    space = ""
+    for ch in text:
+        if ch in punct:
+            if word != "":
+                result.append(word)
+                word = ""
+
+            if space != "":
+                result.append(space)
+                space = ""
+            result.append(ch)
+
+        elif ch == " ":
+            space += ch
+            if word != "":
+                result.append(word)
+                word = ""
+        else:
+            word += ch
+            if space != "":
+                result.append(space)
+                space = ""
+
+    if word != "":
+        result.append(word)
+
+    if space != "":
+        result.append(space)
+
+    return result
+
+
+def add_to_label(address, start, end):
+    punct = string.punctuation.translate(str.maketrans('', '', "-'")) + " "
+    while start > 0 and address[start - 1] not in punct:
+        start -= 1
+
+    while end < len(address) and address[end] not in punct:
+        end += 1
+
+    return address[start: end]
+
+
 def format_punctuatation(text):
     punct = string.punctuation.translate(str.maketrans('', '', "-'"))
     for ch in punct:
@@ -37,16 +84,16 @@ def check_semilar(source, target):
     return True
 
 
-def preprocess(text_word, label_word, pre_start=-1, pre_end=-1):
+def preprocess(dict_acronyms, text_word, label_word, pre_start=-1, pre_end=-1):
     new_text_word, new2old_text = remove_punct(text_word)
     new_label_word, new2old_label = remove_punct(label_word)
     if len(new_text_word) * len(new_label_word) == 0:
         return -1, -1
 
     start, end = -1, -1
+    pos = -1
     max_ratio = 0
     for i in range(0, len(new_text_word) - len(new_label_word) + 1):
-
         if check_semilar(new_text_word[i: i + len(new_label_word)], new_label_word):
             ratio = SequenceMatcher(None, " ".join(new_text_word[i: i + len(new_label_word)]),
                                     " ".join(new_label_word)).ratio()
@@ -56,8 +103,14 @@ def preprocess(text_word, label_word, pre_start=-1, pre_end=-1):
 
             if ratio >= max_ratio:
                 max_ratio = ratio
+                pos = i
                 start = new2old_text[i]
                 end = new2old_text[i + len(new_label_word) - 1] + 1
+
+    if pos >= 0:
+        for i in range(pos, pos + len(new_label_word)):
+            if new_label_word[i - pos] != new_text_word[i]:
+                dict_acronyms[new_text_word[i]] = new_label_word[i - pos]
 
     return start, end
 
@@ -122,6 +175,8 @@ def convert_lines(data, tokenizer, max_sequence_length):
 def read_data(path):
     format_data = []
     data = pd.read_csv(path)
+    dict_acronyms = {}
+
     for ide, raw_address, poi_street in data.values.tolist():
         poi, street = poi_street.split("/")
         raw_address = format_punctuatation(raw_address)
@@ -133,22 +188,22 @@ def read_data(path):
 
         if len(street) >= len(poi):
             if street:
-                street_start, street_end = preprocess(raw_address, street)
+                street_start, street_end = preprocess(dict_acronyms, raw_address, street)
                 if street_start == -1:
                     continue
 
             if poi:
-                poi_start, poi_end = preprocess(raw_address, poi, street_start, street_end)
+                poi_start, poi_end = preprocess(dict_acronyms, raw_address, poi, street_start, street_end)
                 if poi_start == -1:
                     continue
         else:
             if poi:
-                poi_start, poi_end = preprocess(raw_address, poi)
+                poi_start, poi_end = preprocess(dict_acronyms, raw_address, poi)
                 if poi_start == -1:
                     continue
 
             if street:
-                street_start, street_end = preprocess(raw_address, street, poi_start, poi_end)
+                street_start, street_end = preprocess(dict_acronyms, raw_address, street, poi_start, poi_end)
                 if street_start == -1:
                     continue
 
@@ -158,7 +213,7 @@ def read_data(path):
         format_data.append(
             {"raw_address": raw_address, "poi": (poi_start, poi_end), "street": (street_start, street_end)})
 
-    return format_data
+    return format_data, dict_acronyms
 
 
 def seed_everything(SEED):

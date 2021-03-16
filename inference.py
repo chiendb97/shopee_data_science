@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pandas as pd
 import numpy as np
@@ -6,11 +7,11 @@ from tqdm import tqdm
 import torch
 from transformers import RobertaTokenizer, RobertaConfig
 from models import RobertaForTokenClassification
-from utils import format_punctuatation, seed_everything
+from utils import format_punctuatation, seed_everything, split_text, add_to_label
 
 
 def read_csv(path):
-    df = pd.read_csv(path).head(128)
+    df = pd.read_csv(path)
     data = []
     for idx, address in df.values.tolist():
         data.append(address)
@@ -43,7 +44,13 @@ def text_to_index(data, tokenizer, max_sequence_length):
     return index, subwords
 
 
-def sufprocess(data, subwords, preds):
+def handle_acronyms(dict_acronyms, text):
+    words = split_text(text)
+    words = [word if word not in dict_acronyms else dict_acronyms[word] for word in words]
+    return "".join(words)
+
+
+def sufprocess(dict_acronyms, data, subwords, preds):
     index = []
     label = []
     for idx in range(len(data)):
@@ -87,10 +94,12 @@ def sufprocess(data, subwords, preds):
 
         poi, street = "", ""
         if poi_start >= 0:
-            poi = address[poi_start: poi_end].strip()
+            poi = add_to_label(address, poi_start, poi_end).strip()
+            poi = handle_acronyms(dict_acronyms, poi)
 
         if street_start >= 0:
-            street = address[street_start: street_end].strip()
+            street = add_to_label(address, street_start, street_end).strip()
+            street = handle_acronyms(dict_acronyms, street)
 
         label.append(poi + "/" + street)
 
@@ -111,6 +120,7 @@ def sufprocess(data, subwords, preds):
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--test_path', type=str, default='./data/test.csv')
+    parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=16)
@@ -120,9 +130,12 @@ def main():
     args = parser.parse_args()
 
     seed_everything(69)
-    tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
+
+    with open(args.dict_acronyms_path, "r") as f:
+        dict_acronyms = json.load(f)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
     model_bert = torch.load(os.path.join(args.ckpt_path, "model.pt"))
     model_bert.to(device)
     data = read_csv(args.test_path)
@@ -143,7 +156,7 @@ def main():
         y_pred = torch.argmax(y_hat, 2)
         preds += y_pred.detach().cpu().numpy().tolist()
 
-    sufprocess(data, subwords, preds)
+    sufprocess(dict_acronyms, data, subwords, preds)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
 models/model.bin
 models/model.pt
 data/submission.csv
+data/dict_acronyms.json

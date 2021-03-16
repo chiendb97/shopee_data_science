@@ -1,3 +1,5 @@
+import json
+
 from transformers import RobertaTokenizer
 import os
 import argparse
@@ -18,6 +20,7 @@ from utils import convert_lines, seed_everything, read_data
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--train_path', type=str, default='./data/train.csv')
+    parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=32)
@@ -49,7 +52,10 @@ def main():
     else:
         tsfm = model_bert.roberta
 
-    data_train = read_data(args.train_path)
+    data_train, dict_acronyms = read_data(args.train_path)
+
+    with open(args.dict_acronyms_path, "w") as f:
+        json.dump(dict_acronyms, f)
 
     x_train, y_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
 
