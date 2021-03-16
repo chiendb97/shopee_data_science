@@ -30,7 +30,7 @@ def text_to_index(data, tokenizer, max_sequence_length):
         address_word = format_punctuatation(address)
         address = " " + " ".join(address_word)
         input_ids = tokenizer(address)['input_ids']
-        subwords = tokenizer.convert_ids_to_tokens(input_ids)
+        subword = tokenizer.convert_ids_to_tokens(input_ids)
 
         if len(input_ids) > max_sequence_length:
             input_ids = input_ids[:max_sequence_length]
@@ -39,7 +39,7 @@ def text_to_index(data, tokenizer, max_sequence_length):
             input_ids = input_ids + [pad_id, ] * (max_sequence_length - len(input_ids))
 
         index[idx, :] = np.array(input_ids, dtype=np.long)
-        subwords.append(subwords)
+        subwords.append(subword)
 
     return index, subwords
 
@@ -78,15 +78,19 @@ def sufprocess(data, subwords, preds):
                 if num_street == 1:
                     street_end = j + len(sw)
 
-            j += len(pred[i])
+            j += len(sw)
             while j < len(address) and address[j] == " ":
                 j += 1
 
+        print("address:", address)
+        print("pred:", pred)
         if poi_start >= 0:
-            print(address[poi_start: poi_end])
+            print("poi:", address[poi_start: poi_end])
 
         if street_start >= 0:
-            print(address[street_start: street_end])
+            print("street:", address[street_start: street_end])
+
+        print("------------------------------------------------------")
 
 
 def main():
