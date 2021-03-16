@@ -6,10 +6,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fairseq.data import Dictionary
-from fairseq.data.encoders.fastbpe import fastBPE
 from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, precision_recall_fscore_support
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from transformers import RobertaConfig, get_constant_schedule, get_linear_schedule_with_warmup
 from transformers import AdamW

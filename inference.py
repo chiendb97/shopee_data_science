@@ -6,13 +6,12 @@ import numpy as np
 from tqdm import tqdm
 import torch
 from transformers import RobertaTokenizer, RobertaConfig
-
 from models import RobertaForTokenClassification
 from utils import format_punctuatation, seed_everything
 
 
 def read_csv(path):
-    df = pd.read_csv(path).head(100)
+    df = pd.read_csv(path).head(128)
     data = []
     for idx, text in df.values.tolist():
         data.append(text)
@@ -45,11 +44,56 @@ def text_to_index(data, tokenizer, max_sequence_length):
     return index, subwords
 
 
+def sufprocess(data, subwords, preds):
+    for idx in range(len(data)):
+        address = data[idx]
+        subword = subwords[idx][1: -1]
+        pred = preds[idx][1: len(subword) + 1]
+        assert len(subword) == len(pred)
+        poi_start, poi_end, street_start, street_end = -1, -1, -1, -1
+        num_poi, num_street = 0, 0
+        j = 0
+        for i in range(len(subword)):
+            sw = subword[i]
+            if sw.startswith("Ġ"):
+                sw = sw[1:]
+
+            if pred[i] == 1:
+                if num_poi == 0:
+                    poi_start = j
+                    poi_end = j + len(sw)
+                num_poi += 1
+
+            elif pred[i] == 3:
+                if num_street == 0:
+                    street_start = j
+                    street_end = j + len(sw)
+                num_street += 1
+
+            elif pred[i] == 2:
+                if num_poi == 1:
+                    poi_end = j + len(sw)
+
+            elif pred[i] == 4:
+                if num_street == 1:
+                    street_end = j + len(sw)
+
+            j += len(pred[i])
+            while j < len(address) and address[j] == " ":
+                j += 1
+
+        if poi_start >= 0:
+            print(address[poi_start: poi_end])
+
+        if street_start >= 0:
+            print(address[street_start: street_end])
+
+
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--test_path', type=str, default='./data/test.csv')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
-    parser.add_argument('--max_sequence_length', type=int, default=256)
+    parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--ckpt_path', type=str, default='./models')
@@ -60,8 +104,8 @@ def main():
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    model_bert = torch.load(os.path.join(args.ckpt_path, f"model.bin"))
+    model_bert = torch.load(os.path.join(args.ckpt_path, "model.pt"))
+    model_bert.to(device)
     data = read_csv(args.test_path)
     index, subwords = text_to_index(data, tokenizer, args.max_sequence_length)
 
@@ -70,7 +114,7 @@ def main():
 
     model_bert.eval()
 
-    pred = []
+    preds = []
     pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
     for i, (x_batch,) in pbar:
         mask = (x_batch != 1)
@@ -78,7 +122,9 @@ def main():
             y_hat = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         y_pred = torch.argmax(y_hat, 2)
-        pred += y_pred.detach().cpu().numpy().tolist()
+        preds += y_pred.detach().cpu().numpy().tolist()
+
+    sufprocess(data, subwords, preds)
 
 
 if __name__ == '__main__':
