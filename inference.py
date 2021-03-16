@@ -45,6 +45,8 @@ def text_to_index(data, tokenizer, max_sequence_length):
 
 
 def sufprocess(data, subwords, preds):
+    index = []
+    label = []
     for idx in range(len(data)):
         address = data[idx]
         subword = subwords[idx][1: -1]
@@ -82,15 +84,30 @@ def sufprocess(data, subwords, preds):
             while j < len(address) and address[j] == " ":
                 j += 1
 
-        print("address:", address)
-        print("pred:", pred)
+        index.append(idx)
+
+        poi = ""
+        street = ""
         if poi_start >= 0:
-            print("poi:", address[poi_start: poi_end])
+            poi = address[poi_start: poi_end].strip()
 
         if street_start >= 0:
-            print("street:", address[street_start: street_end])
+            street = address[street_start: street_end].strip()
 
-        print("------------------------------------------------------")
+        label.append(poi + "/" + street)
+
+        # print("address:", address)
+        # print("pred:", pred)
+        # if poi_start >= 0:
+        #     print("poi:", address[poi_start: poi_end])
+        #
+        # if street_start >= 0:
+        #     print("street:", address[street_start: street_end])
+        #
+        # print("------------------------------------------------------")
+    
+    df = pd.DataFrame(data={'id': index, 'POI/street': label})
+    df.to_csv("data/submission.csv", index=False)
 
 
 def main():

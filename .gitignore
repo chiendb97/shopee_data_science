@@ -1,2 +1,3 @@
-models/*.bin
-models/*.pt
+models/model.bin
+models/model.pt
+data/submission.csv
