@@ -85,7 +85,7 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         else:
             loss = None
             if labels is not None:
-                loss = self.crf(emissions=logits, tags=labels, mask=attention_mask)
+                loss = self.crf(emissions=logits, tags=labels, mask=attention_mask, reduction='token_mean')
                 loss = -1.0 * loss
 
         return (logits, loss) if loss is not None else logits
