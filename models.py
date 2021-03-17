@@ -10,12 +10,12 @@ class RobertaForTokenClassification(BertPreTrainedModel):
     config_class = RobertaConfig
     base_model_prefix = "roberta"
 
-    def __init__(self, config):
+    def __init__(self, config, activation_function, loss_type):
         super(RobertaForTokenClassification, self).__init__(config)
         self.num_labels = config.num_labels
-        self.activation_function = config.activation_function
+        self.activation_function = activation_function
         assert self.activation_function in ['softmax', 'crf']
-        self.loss_type = config.loss_type
+        self.loss_type = loss_type
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(4 * config.hidden_size, config.num_labels)

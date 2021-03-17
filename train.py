@@ -44,12 +44,12 @@ def main():
     config = RobertaConfig.from_pretrained(
         args.model_name,
         output_hidden_states=True,
-        activation_function=args.activation_function,
-        loss_type=args.loss_type,
         num_labels=5
     )
 
-    model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config)
+    model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config,
+                                                               activation_function=args.activation_function,
+                                                               loss_type=args.loss_type)
     model_bert.cuda()
 
     if torch.cuda.device_count():
