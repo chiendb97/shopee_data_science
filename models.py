@@ -1,7 +1,9 @@
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
+from torchcrf import CRF
 from transformers import BertPreTrainedModel, RobertaConfig, RobertaModel
+from losses import LabelSmoothingCrossEntropy
 
 
 class RobertaForTokenClassification(BertPreTrainedModel):
@@ -11,10 +13,14 @@ class RobertaForTokenClassification(BertPreTrainedModel):
     def __init__(self, config):
         super(RobertaForTokenClassification, self).__init__(config)
         self.num_labels = config.num_labels
+        self.activation_function = config.activation_function
+        assert self.activation_function in ['softmax', 'crf']
+        self.loss_type = config.loss_type
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(4 * config.hidden_size, config.num_labels)
-
+        if self.activation_function == "crf":
+            self.crf = CRF(num_tags=config.num_labels, batch_first=True)
         self.init_weights()
 
     def forward(
@@ -55,18 +61,32 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        loss = None
-        if labels is not None:
-            loss_fct = CrossEntropyLoss()
-            # Only keep active parts of the loss
-            if attention_mask is not None:
-                active_loss = attention_mask.view(-1) == 1
-                active_logits = logits.view(-1, self.num_labels)
-                active_labels = torch.where(
-                    active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
-                )
-                loss = loss_fct(active_logits, active_labels)
-            else:
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+        if self.activation_function == 'softmax':
+            loss = None
+            if labels is not None:
+                assert self.loss_type in ['lsr', 'ce']
+                if self.loss_type == "ce":
+                    loss_fct = CrossEntropyLoss()
+                else:
+                    loss_fct = LabelSmoothingCrossEntropy()
+
+                # Only keep active parts of the loss
+                if attention_mask is not None:
+                    active_loss = attention_mask.view(-1) == 1
+                    active_logits = logits.view(-1, self.num_labels)
+                    active_labels = torch.where(
+                        active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
+                    )
+                    loss = loss_fct(active_logits, active_labels)
+                else:
+                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        else:
+            loss = None
+            if labels is not None:
+                loss = self.crf(emissions=logits, tags=labels, mask=attention_mask)
 
         return (logits, loss) if loss is not None else logits
+
+
+

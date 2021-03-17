@@ -1,5 +1,5 @@
 import json
-
+from itertools import chain
 from transformers import RobertaTokenizer
 import os
 import argparse
@@ -25,7 +25,9 @@ def main():
     parser.add_argument('--output_path', type=str, default='./data/output.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
-    parser.add_argument('--max_sequence_length', type=int, default=128)
+    parser.add_argument('--activation_function', type=str, default='softmax')
+    parser.add_argument('--loss_type', type=str, default='ce')
+    parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--accumulation_steps', type=int, default=5)
     parser.add_argument('--epochs', type=int, default=20)
@@ -34,7 +36,7 @@ def main():
     parser.add_argument('--ckpt_path', type=str, default='./models')
 
     args = parser.parse_args()
-
+    assert args.activation_function in ['softmax', 'crf']
     seed_everything(69)
 
     # Load model
@@ -42,6 +44,8 @@ def main():
     config = RobertaConfig.from_pretrained(
         args.model_name,
         output_hidden_states=True,
+        activation_function=args.activation_function,
+        loss_type=args.loss_type,
         num_labels=5
     )
 
@@ -146,10 +150,18 @@ def main():
             with torch.no_grad():
                 y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
 
-            y_pred = torch.argmax(y_hat, 2)
-            matrix_pred += y_pred.detach().cpu().numpy().tolist()
-            output += y_batch[mask].detach().cpu().numpy().tolist()
-            preds += y_pred[mask].detach().cpu().numpy().tolist()
+            if args.activation_function == 'softmax':
+                y_pred = torch.argmax(y_hat, 2)
+                matrix_pred += y_pred.detach().cpu().numpy().tolist()
+                output += y_batch[mask].detach().cpu().numpy().tolist()
+                preds += y_pred[mask].detach().cpu().numpy().tolist()
+
+            else:
+                y_pred = model_bert.crf.decode(y_hat, mask)
+                matrix_pred += y_pred
+                output += y_batch[mask].detach().cpu().numpy().tolist()
+                preds += list(chain.from_iterable(y_pred))
+
             lossf = loss.item()
             pbar.set_postfix(loss=lossf)
             avg_loss += loss.item() / len(valid_loader)
@@ -164,7 +176,7 @@ def main():
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
         if score >= best_score:
-            torch.save(model_bert, os.path.join(args.ckpt_path, "model.pt"))
+            torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
             best_score = score
             df = pd.DataFrame({"address": data_valid, "label": label_valid, "pred": label_pred})
             df.to_csv(args.output_path, index=False)

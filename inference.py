@@ -130,13 +130,14 @@ def main():
     parser.add_argument('--test_path', type=str, default='./data/test.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
-    parser.add_argument('--max_sequence_length', type=int, default=128)
+    parser.add_argument('--activation_function', type=str, default='softmax')
+    parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--ckpt_path', type=str, default='./models')
 
     args = parser.parse_args()
-
+    assert args.activation_function in ['softmax', 'crf']
     seed_everything(69)
 
     with open(args.dict_acronyms_path, "r") as f:
@@ -144,7 +145,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
-    model_bert = torch.load(os.path.join(args.ckpt_path, "model.pt"))
+    model_bert = torch.load(os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
     model_bert.to(device)
     data = read_csv(args.test_path)
     index, subwords = text_to_index(data, tokenizer, args.max_sequence_length)
@@ -164,10 +165,18 @@ def main():
         y_pred = torch.argmax(y_hat, 2)
         preds += y_pred.detach().cpu().numpy().tolist()
 
+        if args.activation_function == 'softmax':
+            y_pred = torch.argmax(y_hat, 2)
+            preds += y_pred.detach().cpu().numpy().tolist()
+
+        else:
+            y_pred = model_bert.crf.decode(y_hat, mask)
+            preds += y_pred
+
     index, label = sufprocess(dict_acronyms, data, subwords, preds)
 
     df = pd.DataFrame(data={'id': index, 'POI/street': label})
-    df.to_csv("data/submission.csv", index=False)
+    df.to_csv("data/submission_{}.csv".format(args.activation_function), index=False)
 
 
 if __name__ == '__main__':
