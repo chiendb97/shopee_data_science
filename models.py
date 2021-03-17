@@ -21,6 +21,7 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         self.classifier = nn.Linear(4 * config.hidden_size, config.num_labels)
         if self.activation_function == "crf":
             self.crf = CRF(num_tags=config.num_labels, batch_first=True)
+
         self.init_weights()
 
     def forward(
@@ -85,6 +86,7 @@ class RobertaForTokenClassification(BertPreTrainedModel):
             loss = None
             if labels is not None:
                 loss = self.crf(emissions=logits, tags=labels, mask=attention_mask)
+                loss = -1.0 * loss
 
         return (logits, loss) if loss is not None else logits
 

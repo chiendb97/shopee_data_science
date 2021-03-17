@@ -157,7 +157,7 @@ def main():
                 preds += y_pred[mask].detach().cpu().numpy().tolist()
 
             else:
-                y_pred = model_bert.crf.decode(y_hat, mask)
+                y_pred = model_bert.module.crf.decode(y_hat, mask)
                 matrix_pred += y_pred
                 output += y_batch[mask].detach().cpu().numpy().tolist()
                 preds += list(chain.from_iterable(y_pred))
