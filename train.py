@@ -138,6 +138,7 @@ def main():
         pbar = tqdm(enumerate(valid_loader), total=len(valid_loader), leave=False)
         output = []
         preds = []
+        matrix_pred = []
         avg_loss = 0.
 
         for i, (x_batch, y_batch) in pbar:
@@ -146,13 +147,14 @@ def main():
                 y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
 
             y_pred = torch.argmax(y_hat, 2)
+            matrix_pred += y_pred.detach().cpu().numpy().tolist()
             output += y_batch[mask].detach().cpu().numpy().tolist()
             preds += y_pred[mask].detach().cpu().numpy().tolist()
             lossf = loss.item()
             pbar.set_postfix(loss=lossf)
             avg_loss += loss.item() / len(valid_loader)
 
-        index, label_pred = sufprocess(dict_acronyms, data_valid, subwords_valid, preds)
+        index, label_pred = sufprocess(dict_acronyms, data_valid, subwords_valid, matrix_pred)
         score = accuracy_score(label_valid, label_pred)
         precision, recall, f1_score, support = precision_recall_fscore_support(output, preds)
         print(f"\nValid avg loss = {avg_loss:.4f}")
