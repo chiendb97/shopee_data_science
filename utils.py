@@ -178,13 +178,11 @@ def read_data(path):
     data = pd.read_csv(path)
     dict_acronyms = {}
     raw_data, raw_label = [], []
-    for ide, raw_address, poi_street in data.values.tolist():
-        raw_data.append(raw_address.strip())
-        raw_label.append(poi_street.strip())
+    for ide, address, poi_street in data.values.tolist():
 
         poi, street = poi_street.split("/")
         poi, street = poi.strip(), street.strip()
-        raw_address = format_punctuatation(raw_address)
+        raw_address = format_punctuatation(address)
         poi = format_punctuatation(poi)
         street = format_punctuatation(street)
 
@@ -215,6 +213,8 @@ def read_data(path):
         if street_start >= 0 and poi_start >= 0 and not (poi_end <= street_start or street_end <= poi_start):
             continue
 
+        raw_data.append(address.strip())
+        raw_label.append(poi_street.strip())
         format_data.append(
             {"raw_address": raw_address, "poi": (poi_start, poi_end), "street": (street_start, street_end)})
 
