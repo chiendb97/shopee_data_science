@@ -10,13 +10,22 @@ from models import RobertaForTokenClassification
 from utils import format_punctuatation, seed_everything, split_text, add_to_label
 
 
-def read_csv(path):
+def read_csv(path, test=True):
     df = pd.read_csv(path)
     data = []
-    for idx, address in df.values.tolist():
-        data.append(address)
+    label = []
 
-    return data
+    if test:
+        for idx, address in df.values.tolist():
+            data.append(address)
+
+        return data
+    else:
+        for idx, address, lbl in df.values.tolist():
+            data.append(address)
+            label.append(lbl)
+
+        return data, label
 
 
 def text_to_index(data, tokenizer, max_sequence_length):
@@ -113,8 +122,7 @@ def sufprocess(dict_acronyms, data, subwords, preds):
         #
         # print("------------------------------------------------------")
 
-    df = pd.DataFrame(data={'id': index, 'POI/street': label})
-    df.to_csv("data/submission.csv", index=False)
+    return index, label
 
 
 def main():
@@ -156,7 +164,10 @@ def main():
         y_pred = torch.argmax(y_hat, 2)
         preds += y_pred.detach().cpu().numpy().tolist()
 
-    sufprocess(dict_acronyms, data, subwords, preds)
+    index, label = sufprocess(dict_acronyms, data, subwords, preds)
+
+    df = pd.DataFrame(data={'id': index, 'POI/street': label})
+    df.to_csv("data/submission.csv", index=False)
 
 
 if __name__ == '__main__':

@@ -8,18 +8,21 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, precision_recall_fscore_support
+from sklearn.metrics import f1_score, roc_auc_score, precision_recall_fscore_support
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from transformers import RobertaConfig, get_constant_schedule, get_linear_schedule_with_warmup
 from transformers import AdamW
+
+from inference import sufprocess
 from models import RobertaForTokenClassification
-from utils import convert_lines, seed_everything, read_data
+from utils import convert_lines, seed_everything, read_data, accuracy_score
 
 
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--train_path', type=str, default='./data/train.csv')
+    parser.add_argument('--outout_path', type=str, default='./data/output.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--max_sequence_length', type=int, default=128)
@@ -52,14 +55,17 @@ def main():
     else:
         tsfm = model_bert.roberta
 
-    data_train, dict_acronyms = read_data(args.train_path)
+    print("Read data ...")
+    data_train, raw_data, raw_label, dict_acronyms = read_data(args.train_path)
 
     with open(args.dict_acronyms_path, "w") as f:
         json.dump(dict_acronyms, f)
 
-    x_train, y_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
+    print("Convert line ...")
+    x_train, y_train, subwords = convert_lines(data_train, tokenizer, args.max_sequence_length)
 
-    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2)
+    x_train, x_valid, y_train, y_valid, subwords_train, subwords_valid, data_train, data_valid, label_train, label_valid \
+        = train_test_split(x_train, y_train, subwords, raw_data, raw_label, test_size=0.2, random_state=42)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
                                                    torch.tensor(y_train, dtype=torch.long))
@@ -131,7 +137,7 @@ def main():
         model_bert.eval()
         pbar = tqdm(enumerate(valid_loader), total=len(valid_loader), leave=False)
         output = []
-        pred = []
+        preds = []
         avg_loss = 0.
 
         for i, (x_batch, y_batch) in pbar:
@@ -141,13 +147,14 @@ def main():
 
             y_pred = torch.argmax(y_hat, 2)
             output += y_batch[mask].detach().cpu().numpy().tolist()
-            pred += y_pred[mask].detach().cpu().numpy().tolist()
+            preds += y_pred[mask].detach().cpu().numpy().tolist()
             lossf = loss.item()
             pbar.set_postfix(loss=lossf)
             avg_loss += loss.item() / len(valid_loader)
 
-        score = accuracy_score(output, pred)
-        precision, recall, f1_score, support = precision_recall_fscore_support(output, pred)
+        index, label_pred = sufprocess(dict_acronyms, data_valid, subwords_valid, preds)
+        score = accuracy_score(label_valid, label_pred)
+        precision, recall, f1_score, support = precision_recall_fscore_support(output, preds)
         print(f"\nValid avg loss = {avg_loss:.4f}")
         print(f"\nValid accuracy score = {score:.4f}")
         print(f"\nPrecision:", precision)
@@ -157,6 +164,8 @@ def main():
         if score >= best_score:
             torch.save(model_bert, os.path.join(args.ckpt_path, "model.pt"))
             best_score = score
+            df = pd.DataFrame({"address": data_valid, "label": label_valid, "pred": label_pred})
+            df.to_csv(args.output_path, index=False)
 
 
 if __name__ == '__main__':

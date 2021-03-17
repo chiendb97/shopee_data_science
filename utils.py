@@ -77,7 +77,6 @@ def check_semilar(source, target):
     for i in range(len(source)):
         # source_rm_punct = source[i].translate(str.maketrans('', '', '.,'))
         # target_rm_punct = target[i].translate(str.maketrans('', '', '.,'))
-
         if not target[i].startswith(source[i]):
             return False
 
@@ -118,6 +117,7 @@ def preprocess(dict_acronyms, text_word, label_word, pre_start=-1, pre_end=-1):
 def convert_lines(data, tokenizer, max_sequence_length):
     index = np.zeros((len(data), max_sequence_length))
     label = np.zeros((len(data), max_sequence_length))
+    subwords = []
     cls_id = 0
     eos_id = 2
     pad_id = 1
@@ -129,7 +129,8 @@ def convert_lines(data, tokenizer, max_sequence_length):
 
         address = " " + " ".join(address_word)
         input_ids = tokenizer(address)['input_ids']
-        subwords = tokenizer.convert_ids_to_tokens(input_ids)
+        subword = tokenizer.convert_ids_to_tokens(input_ids)
+        subwords.append(subword)
         lbl_raw = [0] * len(address_word)
 
         if poi_start >= 0:
@@ -143,8 +144,8 @@ def convert_lines(data, tokenizer, max_sequence_length):
                 lbl_raw[i] = 4
 
         k = -1
-        lbl = [0] * (len(subwords) - 2)
-        for i, word in enumerate(subwords[1:-1]):
+        lbl = [0] * (len(subword) - 2)
+        for i, word in enumerate(subword[1:-1]):
             if word.startswith("Ġ"):
                 k += 1
 
@@ -169,16 +170,20 @@ def convert_lines(data, tokenizer, max_sequence_length):
         index[idx, :] = np.array(input_ids, dtype=np.long)
         label[idx, :] = np.array(lbl, dtype=np.long)
 
-    return index, label
+    return index, label, subwords
 
 
 def read_data(path):
     format_data = []
     data = pd.read_csv(path)
     dict_acronyms = {}
-
+    raw_data, raw_label = [], []
     for ide, raw_address, poi_street in data.values.tolist():
+        raw_data.append(raw_address.strip())
+        raw_label.append(poi_street.strip())
+
         poi, street = poi_street.split("/")
+        poi, street = poi.strip(), street.strip()
         raw_address = format_punctuatation(raw_address)
         poi = format_punctuatation(poi)
         street = format_punctuatation(street)
@@ -213,7 +218,7 @@ def read_data(path):
         format_data.append(
             {"raw_address": raw_address, "poi": (poi_start, poi_end), "street": (street_start, street_end)})
 
-    return format_data, dict_acronyms
+    return format_data, raw_data, raw_label, dict_acronyms
 
 
 def seed_everything(SEED):
@@ -225,3 +230,13 @@ def seed_everything(SEED):
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+def accuracy_score(y_true, y_pred):
+    assert len(y_true) == len(y_true)
+    count = 0.
+    for i in range(len(y_true)):
+        if y_true == y_pred:
+            count += 1
+
+    return count / len(y_true)
