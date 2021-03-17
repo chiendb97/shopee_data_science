@@ -162,9 +162,6 @@ def main():
         with torch.no_grad():
             y_hat = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
-        y_pred = torch.argmax(y_hat, 2)
-        preds += y_pred.detach().cpu().numpy().tolist()
-
         if args.activation_function == 'softmax':
             y_pred = torch.argmax(y_hat, 2)
             preds += y_pred.detach().cpu().numpy().tolist()

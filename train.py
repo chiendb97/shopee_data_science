@@ -122,7 +122,7 @@ def main():
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
         for i, (x_batch, y_batch) in pbar:
             mask = (x_batch != 1)
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
+            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch.cuda())
             loss.backward()
             if i % args.accumulation_steps == 0 or i == len(pbar) - 1:
                 optimizer.step()
@@ -148,7 +148,7 @@ def main():
         for i, (x_batch, y_batch) in pbar:
             mask = (x_batch != 1)
             with torch.no_grad():
-                y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch)
+                y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch.cuda())
 
             if args.activation_function == 'softmax':
                 y_pred = torch.argmax(y_hat, 2)
@@ -157,7 +157,7 @@ def main():
                 preds += y_pred[mask].detach().cpu().numpy().tolist()
 
             else:
-                y_pred = model_bert.module.crf.decode(y_hat, mask)
+                y_pred = model_bert.module.crf.decode(y_hat, mask.cuda())
                 matrix_pred += y_pred
                 output += y_batch[mask].detach().cpu().numpy().tolist()
                 preds += list(chain.from_iterable(y_pred))
