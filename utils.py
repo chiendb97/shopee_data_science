@@ -236,7 +236,7 @@ def accuracy_score(y_true, y_pred):
     assert len(y_true) == len(y_true)
     count = 0.
     for i in range(len(y_true)):
-        if y_true == y_pred:
+        if y_true[i] == y_pred[i]:
             count += 1
 
     return count / len(y_true)

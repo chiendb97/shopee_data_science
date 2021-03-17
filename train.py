@@ -22,7 +22,7 @@ from utils import convert_lines, seed_everything, read_data, accuracy_score
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--train_path', type=str, default='./data/train.csv')
-    parser.add_argument('--outout_path', type=str, default='./data/output.csv')
+    parser.add_argument('--output_path', type=str, default='./data/output.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--max_sequence_length', type=int, default=128)
