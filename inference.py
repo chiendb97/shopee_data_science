@@ -149,7 +149,7 @@ def main():
             preds += y_pred.detach().cpu().numpy().tolist()
 
         else:
-            y_pred = model_bert.crf.decode(y_hat, mask)
+            y_pred = model_bert.module.crf.decode(y_hat, mask)
             preds += y_pred
 
     index, label = sufprocess(dict_acronyms, data, subwords, preds)

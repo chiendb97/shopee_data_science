@@ -23,7 +23,6 @@ from augment import augment_punct, augment_replace_address
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--train_path', type=str, default='./data/train.csv')
-    parser.add_argument('--output_path', type=str, default='./data/output.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--activation_function', type=str, default='softmax')
@@ -192,7 +191,7 @@ def main():
             torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
             best_score = score
             df = pd.DataFrame({"address": text_valid, "label": label_valid, "pred": label_pred})
-            df.to_csv(args.output_path, index=False)
+            df.to_csv("./data/output_{}.csv".format(args.activation_function), index=False)
 
 
 if __name__ == '__main__':
