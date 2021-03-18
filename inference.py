@@ -7,25 +7,7 @@ from tqdm import tqdm
 import torch
 from transformers import RobertaTokenizer, RobertaConfig
 from models import RobertaForTokenClassification
-from utils import format_punctuatation, seed_everything, split_text, add_to_label
-
-
-def read_csv(path, test=True):
-    df = pd.read_csv(path)
-    data = []
-    label = []
-
-    if test:
-        for idx, address in df.values.tolist():
-            data.append(address)
-
-        return data
-    else:
-        for idx, address, lbl in df.values.tolist():
-            data.append(address)
-            label.append(lbl)
-
-        return data, label
+from utils import format_punctuatation, seed_everything, split_text, add_to_label, read_csv
 
 
 def text_to_index(data, tokenizer, max_sequence_length):
@@ -147,7 +129,7 @@ def main():
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
     model_bert = torch.load(os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
     model_bert.to(device)
-    data = read_csv(args.test_path)
+    data = read_csv(args.test_path, test=True)
     index, subwords = text_to_index(data, tokenizer, args.max_sequence_length)
 
     test_dataset = torch.utils.data.TensorDataset((torch.tensor(index, dtype=torch.long)))

@@ -173,12 +173,29 @@ def convert_lines(data, tokenizer, max_sequence_length):
     return index, label, subwords
 
 
-def read_data(path):
+def read_csv(path, test=False):
+    df = pd.read_csv(path)
+    data = []
+    label = []
+
+    if test:
+        for idx, address in df.values.tolist():
+            data.append(address)
+
+        return data
+    else:
+        for idx, address, lbl in df.values.tolist():
+            data.append(address)
+            label.append(lbl)
+
+        return data, label
+
+
+def read_data(text, label, da=True):
     format_data = []
-    data = pd.read_csv(path)
     dict_acronyms = {}
     raw_data, raw_label = [], []
-    for ide, address, poi_street in data.values.tolist():
+    for address, poi_street in list(zip(text, label)):
 
         poi, street = poi_street.split("/")
         poi, street = poi.strip(), street.strip()
@@ -218,7 +235,10 @@ def read_data(path):
         format_data.append(
             {"raw_address": raw_address, "poi": (poi_start, poi_end), "street": (street_start, street_end)})
 
-    return format_data, raw_data, raw_label, dict_acronyms
+    if da:
+        return format_data, raw_data, raw_label, dict_acronyms
+
+    return format_data, raw_data, raw_label
 
 
 def seed_everything(SEED):

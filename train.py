@@ -16,7 +16,8 @@ from transformers import AdamW
 
 from inference import sufprocess
 from models import RobertaForTokenClassification
-from utils import convert_lines, seed_everything, read_data, accuracy_score
+from utils import convert_lines, seed_everything, read_data, accuracy_score, read_csv
+from augment import augment_punct, augment_replace_address
 
 
 def main():
@@ -59,17 +60,29 @@ def main():
     else:
         tsfm = model_bert.roberta
 
-    print("Read data ...")
-    data_train, raw_data, raw_label, dict_acronyms = read_data(args.train_path)
+    print("\nRead data ...")
+
+    data_train, label_train = read_csv(args.train_path)
+    data_train, data_valid, label_train, label_valid = train_test_split(data_train, label_train, test_size=0.2,
+                                                                        random_state=42)
+
+    data_train_ap, label_train_ap = augment_punct(data_train, label_train)
+
+    data_train, text_train, label_train, dict_acronyms = read_data(data_train, label_train)
+    data_train_ap, text_train_ap, label_train_ap = read_data(data_train_ap, label_train_ap, da=False)
+    data_train_ar, label_train_ar = augment_replace_address(data_train, label_train, num_multiply=5)
+
+    data_train = data_train + data_train_ap + data_train_ar
+    label_train = label_train + label_train_ap + label_train_ar
+
+    data_valid, text_valid, label_valid = read_data(data_valid, label_valid, da=False)
 
     with open(args.dict_acronyms_path, "w") as f:
         json.dump(dict_acronyms, f)
 
-    print("Convert line ...")
-    x_train, y_train, subwords = convert_lines(data_train, tokenizer, args.max_sequence_length)
-
-    x_train, x_valid, y_train, y_valid, subwords_train, subwords_valid, data_train, data_valid, label_train, label_valid \
-        = train_test_split(x_train, y_train, subwords, raw_data, raw_label, test_size=0.2, random_state=42)
+    print("\nConvert line ...")
+    x_train, y_train, subwords_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
+    x_valid, y_valid, subwords_valid = convert_lines(data_valid, tokenizer, args.max_sequence_length)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
                                                    torch.tensor(y_train, dtype=torch.long))
@@ -166,7 +179,7 @@ def main():
             pbar.set_postfix(loss=lossf)
             avg_loss += loss.item() / len(valid_loader)
 
-        index, label_pred = sufprocess(dict_acronyms, data_valid, subwords_valid, matrix_pred)
+        index, label_pred = sufprocess(dict_acronyms, text_valid, subwords_valid, matrix_pred)
         score = accuracy_score(label_valid, label_pred)
         precision, recall, f1_score, support = precision_recall_fscore_support(output, preds)
         print(f"\nValid avg loss = {avg_loss:.4f}")
@@ -178,7 +191,7 @@ def main():
         if score >= best_score:
             torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
             best_score = score
-            df = pd.DataFrame({"address": data_valid, "label": label_valid, "pred": label_pred})
+            df = pd.DataFrame({"address": text_valid, "label": label_valid, "pred": label_pred})
             df.to_csv(args.output_path, index=False)
 
 
