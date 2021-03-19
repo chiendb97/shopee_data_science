@@ -22,7 +22,7 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         self.classifier_ner = nn.Linear(4 * config.hidden_size, num_ner_labels)
         self.classifier_cf = nn.Linear(4 * config.hidden_size, num_cf_labels)
         if self.activation_function == "crf":
-            self.crf = CRF(num_tags=config.num_labels, batch_first=True)
+            self.crf = CRF(num_tags=num_ner_labels, batch_first=True)
 
         self.init_weights()
 
