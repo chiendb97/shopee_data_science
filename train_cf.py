@@ -95,7 +95,7 @@ def main():
     weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
     sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, args.batch_size)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, sampler=sampler)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Creating optimizer and lr schedulers
