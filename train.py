@@ -205,6 +205,7 @@ def main():
         precision, recall, f1_score, support = precision_recall_fscore_support(output_ner, pred_ner)
         print(f"\nValid avg loss = {avg_loss:.4f}")
         print(f"\nValid accuracy score = {score:.4f}")
+        print(f"\nClassification accuracy score = {score_cf:.4f}")
         print(f"\nPrecision:", precision)
         print(f"\nRecall:", recall)
         print(f"\nF1 score:", f1_score)
