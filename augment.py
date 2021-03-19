@@ -6,11 +6,6 @@ def augment_punct(data, label):
     augment_label = []
 
     for address, lbl in list(zip(data, label)):
-        if lbl == "/":
-            for k in range(num_multiply):
-                augment_data.append(address)
-                augment_label.append(lbl)
-
         address = address.replace(",", "")
         lbl = lbl.replace(",", "")
         augment_data.append(address)
@@ -19,10 +14,20 @@ def augment_punct(data, label):
     return augment_data, augment_label
 
 
-def augment_replace_address(data, label, num_multiply=5):
+def augment_replace_address(data, label, num_multiply=1):
     augment_data = []
     augment_label = []
     index = [[], [], [], []]
+
+    for idx, info in enumerate(data):
+        if info['poi'][0] >= 0 and info['street'][0] >= 0:
+            index[0].append(idx)
+        elif info['poi'][0] >= 0:
+            index[1].append(idx)
+        elif info['street'][0] >= 0:
+            index[2].append(idx)
+        else:
+            index[3].append(idx)
 
     for i, info in enumerate(data):
         if info['poi'][0] >= 0 and info['street'][0] >= 0:
