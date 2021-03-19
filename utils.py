@@ -203,8 +203,8 @@ def read_data(text, label, da=True):
     format_data = []
     dict_acronyms = {}
     raw_data, raw_label = [], []
-    for address, poi_street in list(zip(text, label)):
 
+    for address, poi_street in list(zip(text, label)):
         poi, street = poi_street.split("/")
         poi, street = poi.strip(), street.strip()
         raw_address = format_punctuatation(address)
@@ -240,6 +240,7 @@ def read_data(text, label, da=True):
 
         raw_data.append(address.strip())
         raw_label.append(poi_street.strip())
+
         format_data.append(
             {"raw_address": raw_address, "poi": (poi_start, poi_end), "street": (street_start, street_end)})
 

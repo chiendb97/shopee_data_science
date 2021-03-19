@@ -26,9 +26,9 @@ def main():
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
     parser.add_argument('--activation_function', type=str, default='softmax')
-    parser.add_argument('--loss_type', type=str, default='ce')
+    parser.add_argument('--loss_type', type=str, default='lsr')
     parser.add_argument('--max_sequence_length', type=int, default=64)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--accumulation_steps', type=int, default=5)
     parser.add_argument('--num_multiply', type=int, default=1)
     parser.add_argument('--epochs', type=int, default=20)
@@ -44,13 +44,12 @@ def main():
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
     config = RobertaConfig.from_pretrained(
         args.model_name,
+        num_labels=5,
         output_hidden_states=True
     )
 
     model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config,
                                                                activation_function=args.activation_function,
-                                                               num_ner_labels=5,
-                                                               num_cf_labels=2,
                                                                loss_type=args.loss_type)
 
     model_bert.cuda()
@@ -105,6 +104,7 @@ def main():
     num_train_optimization_steps = int(args.epochs * len(data_train) / args.batch_size / args.accumulation_steps)
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr,
                       correct_bias=False)  # To reproduce BertAdam specific behavior set correct_bias=False
+
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100,
                                                 num_training_steps=num_train_optimization_steps)  # PyTorch scheduler
     scheduler0 = get_constant_schedule(optimizer)  # PyTorch scheduler
@@ -138,12 +138,9 @@ def main():
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
         for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
             mask = (x_batch != 1)
-            y_hat_ner, y_hat_cf, loss_ner, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
-                                                                labels_ner=y_ner_batch.cuda(),
-                                                                labels_cf=y_cf_batch.cuda())
+            y_hat_ner, loss_ner = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels_ner=y_ner_batch.cuda())
 
-            loss = (loss_ner + loss_cf) / 2
-            loss.backward()
+            loss_ner.backward()
             if i % args.accumulation_steps == 0 or i == len(pbar) - 1:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -152,8 +149,8 @@ def main():
                 else:
                     scheduler0.step()
 
-            pbar.set_postfix(loss_ner=loss_ner.item(), loss_cf=loss_cf.item())
-            avg_loss += loss.item() / len(train_loader)
+            pbar.set_postfix(loss_ner=loss_ner.item())
+            avg_loss += loss_ner.item() / len(train_loader)
 
         print("------------------------------- Training epoch {} -------------------------------".format(epoch + 1))
         print(f"\nTrain avg loss = {avg_loss:.4f}")
@@ -162,50 +159,35 @@ def main():
         pbar = tqdm(enumerate(valid_loader), total=len(valid_loader), leave=False)
         output_ner = []
         pred_ner = []
-
-        output_cf = []
-        pred_cf = []
         matrix_pred = []
         avg_loss = 0.
 
-        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
+        for i, (x_batch, y_ner_batch) in pbar:
             mask = (x_batch != 1)
             with torch.no_grad():
-                y_hat_ner, y_hat_cf, loss_ner, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
-                                                                    labels_ner=y_ner_batch.cuda(),
-                                                                    labels_cf=y_cf_batch.cuda())
+                y_hat_ner, loss_ner = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
+                                                 labels_ner=y_ner_batch.cuda())
 
             if args.activation_function == 'softmax':
                 y_pred_ner = torch.argmax(y_hat_ner, 2)
-                y_pred_cf = torch.argmax(y_hat_cf, 1)
                 matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
                 output_ner += y_ner_batch[mask].detach().cpu().numpy().tolist()
                 pred_ner += y_pred_ner[mask].detach().cpu().numpy().tolist()
 
-                output_cf += y_cf_batch.detach().cpu().numpy().tolist()
-                pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
-
             else:
                 y_pred_ner = model_bert.module.crf.decode(y_hat_ner, mask.cuda())
-                y_pred_cf = torch.argmax(y_hat_cf, 1)
                 matrix_pred += y_pred_ner
                 output_ner += y_ner_batch[mask].detach().cpu().numpy().tolist()
                 pred_ner += list(chain.from_iterable(y_pred_ner))
 
-                output_cf += y_cf_batch.detach().cpu().numpy().tolist()
-                pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
+            pbar.set_postfix(loss_ner=loss_ner.item())
+            avg_loss += loss_ner.item() / len(valid_loader)
 
-            loss = (loss_ner + loss_cf) / 2
-            pbar.set_postfix(loss_ner=loss_ner.item(), loss_cf=loss_cf.item())
-            avg_loss += loss.item() / len(valid_loader)
-
-        index, label_pred = sufprocess(dict_acronyms, text_valid, subwords_valid, matrix_pred, pred_cf)
-        score = accuracy_score(label_valid, label_pred)
-        score_cf = accuracy_score(output_cf, pred_cf)
+        index, label_pred = sufprocess(dict_acronyms, text_valid, subwords_valid, matrix_pred)
+        score_ner = accuracy_score(label_valid, label_pred)
         precision, recall, f1_score, support = precision_recall_fscore_support(output_ner, pred_ner)
         print(f"\nValid avg loss = {avg_loss:.4f}")
-        print(f"\nValid accuracy score = {score:.4f}")
-        print(f"\nClassification accuracy score = {score_cf:.4f}")
+        print(f"\nValid accuracy score = {score_ner:.4f}")
         print(f"\nPrecision:", precision)
         print(f"\nRecall:", recall)
         print(f"\nF1 score:", f1_score)

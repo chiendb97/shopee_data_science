@@ -41,7 +41,7 @@ def handle_acronyms(dict_acronyms, text):
     return "".join(words)
 
 
-def sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf):
+def sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf=None):
     index = []
     label = []
     for idx in range(len(data)):
@@ -92,7 +92,7 @@ def sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf):
             street = add_to_label(address, street_start, street_end).strip()
             # street = handle_acronyms(dict_acronyms, street)
 
-        if pred_cf[idx] == 0:
+        if pred_cf is not None and pred_cf[idx] == 0:
             poi = ""
             street = ""
 
