@@ -139,7 +139,7 @@ def main():
         optimizer.zero_grad()
         model_bert.train()
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
-        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
+        for i, (x_batch, y_cf_batch) in pbar:
             mask = (x_batch != 1)
             y_hat_cf, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels_cf=y_cf_batch.cuda())
 
@@ -166,7 +166,7 @@ def main():
 
         avg_loss = 0.
 
-        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
+        for i, (x_batch, y_cf_batch) in pbar:
             mask = (x_batch != 1)
             with torch.no_grad():
                 y_hat_cf, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
