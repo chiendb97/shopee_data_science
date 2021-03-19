@@ -54,7 +54,6 @@ def main():
     parser.add_argument('--ckpt_path', type=str, default='./models')
 
     args = parser.parse_args()
-    assert args.activation_function in ['softmax', 'crf']
     seed_everything(69)
 
     # Load model
