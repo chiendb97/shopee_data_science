@@ -188,7 +188,7 @@ def main():
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
         if score_cf >= best_score:
-            torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model_cf.pt"))
+            torch.save(model_bert, os.path.join(args.ckpt_path, "model_cf.pt"))
             best_score = score_cf
 
 
