@@ -92,7 +92,7 @@ def main():
     valid_dataset = torch.utils.data.TensorDataset(torch.tensor(x_valid, dtype=torch.long),
                                                    torch.tensor(y_cf_valid, dtype=torch.long))
 
-    weights = make_weights_for_balanced_classes(y_cf_train, 2)
+    weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
     sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, args.batch_size)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, sampler=sampler)
