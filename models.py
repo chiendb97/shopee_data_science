@@ -144,7 +144,6 @@ class RobertaForClassification(BertPreTrainedModel):
                                outputs[1][-4][:, 0, ...]), -1)
 
         output_cf = self.dropout(output_cf)
-
         logits_cf = self.classifier_cf(output_cf)
 
         loss_cf = None

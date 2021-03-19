@@ -85,11 +85,9 @@ def main():
     x_valid, y_ner_valid, y_cf_valid, subwords_valid = convert_lines(data_valid, tokenizer, args.max_sequence_length)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
-                                                   torch.tensor(y_ner_train, dtype=torch.long),
-                                                   torch.tensor(y_cf_train, dtype=torch.long))
+                                                   torch.tensor(y_ner_train, dtype=torch.long))
     valid_dataset = torch.utils.data.TensorDataset(torch.tensor(x_valid, dtype=torch.long),
-                                                   torch.tensor(y_ner_valid, dtype=torch.long),
-                                                   torch.tensor(y_cf_valid, dtype=torch.long))
+                                                   torch.tensor(y_ner_valid, dtype=torch.long))
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
@@ -136,7 +134,7 @@ def main():
         optimizer.zero_grad()
         model_bert.train()
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
-        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
+        for i, (x_batch, y_ner_batch) in pbar:
             mask = (x_batch != 1)
             y_hat_ner, loss_ner = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels_ner=y_ner_batch.cuda())
 
