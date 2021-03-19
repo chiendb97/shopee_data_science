@@ -1,7 +1,7 @@
 import random
 
 
-def augment_punct(data, label, num_multiply=5):
+def augment_punct(data, label):
     augment_data = []
     augment_label = []
 
@@ -23,16 +23,6 @@ def augment_replace_address(data, label, num_multiply=5):
     augment_data = []
     augment_label = []
     index = [[], [], [], []]
-
-    for idx, info in enumerate(data):
-        if info['poi'][0] >= 0 and info['street'][0] >= 0:
-            index[0].append(idx)
-        elif info['poi'][0] >= 0:
-            index[1].append(idx)
-        elif info['street'][0] >= 0:
-            index[2].append(idx)
-        else:
-            index[3].append(idx)
 
     for i, info in enumerate(data):
         if info['poi'][0] >= 0 and info['street'][0] >= 0:
@@ -108,40 +98,39 @@ def augment_replace_address(data, label, num_multiply=5):
 
                 augment_label.append(label[idx])
 
-    for k in range(num_multiply):
-        for i, info in enumerate(data):
-            if info['poi'][0] >= 0 and info['street'][0] >= 0:
-                poi_start, poi_end = info['poi']
-                street_start, street_end = info['street']
-                address = info['raw_address']
-                new_address = address.copy()
+    for i, info in enumerate(data):
+        if info['poi'][0] >= 0 and info['street'][0] >= 0:
+            poi_start, poi_end = info['poi']
+            street_start, street_end = info['street']
+            address = info['raw_address']
+            new_address = address.copy()
 
-                if poi_start < street_start:
-                    new_address[street_start: street_end] = []
-                    new_address[poi_start: poi_end] = []
-                else:
-                    new_address[poi_start: poi_end] = []
-                    new_address[street_start: street_end] = []
-
-                augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
-                augment_label.append("/")
-
-            elif info['poi'][0] >= 0:
-                poi_start, poi_end = info['poi']
-                address = info['raw_address']
-                new_address = address.copy()
+            if poi_start < street_start:
+                new_address[street_start: street_end] = []
                 new_address[poi_start: poi_end] = []
-
-                augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
-                augment_label.append("/")
-
-            elif info['street'][0] >= 0:
-                street_start, street_end = info['street']
-                address = info['raw_address']
-                new_address = address.copy()
+            else:
+                new_address[poi_start: poi_end] = []
                 new_address[street_start: street_end] = []
 
-                augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
-                augment_label.append("/")
+            augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
+            augment_label.append("/")
+
+        elif info['poi'][0] >= 0:
+            poi_start, poi_end = info['poi']
+            address = info['raw_address']
+            new_address = address.copy()
+            new_address[poi_start: poi_end] = []
+
+            augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
+            augment_label.append("/")
+
+        elif info['street'][0] >= 0:
+            street_start, street_end = info['street']
+            address = info['raw_address']
+            new_address = address.copy()
+            new_address[street_start: street_end] = []
+
+            augment_data.append({"raw_address": new_address, "poi": (-1, -1), "street": (-1, -1)})
+            augment_label.append("/")
 
     return augment_data, augment_label

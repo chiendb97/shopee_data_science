@@ -41,13 +41,13 @@ def handle_acronyms(dict_acronyms, text):
     return "".join(words)
 
 
-def sufprocess(dict_acronyms, data, subwords, preds):
+def sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf):
     index = []
     label = []
     for idx in range(len(data)):
         address = data[idx]
         subword = subwords[idx][1: -1]
-        pred = preds[idx][1: len(subword) + 1]
+        pred = matrix_pred[idx][1: len(subword) + 1]
         assert len(subword) == len(pred)
         poi_start, poi_end, street_start, street_end = -1, -1, -1, -1
         num_poi, num_street = 0, 0
@@ -91,6 +91,10 @@ def sufprocess(dict_acronyms, data, subwords, preds):
         if street_start >= 0:
             street = add_to_label(address, street_start, street_end).strip()
             # street = handle_acronyms(dict_acronyms, street)
+
+        if pred_cf[idx] == 0:
+            poi = ""
+            street = ""
 
         label.append(poi + "/" + street)
 
@@ -137,22 +141,27 @@ def main():
 
     model_bert.eval()
 
-    preds = []
+    matrix_pred = []
+    pred_cf = []
     pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
     for i, (x_batch,) in pbar:
         mask = (x_batch != 1)
         with torch.no_grad():
-            y_hat = model_bert(x_batch.to(device), attention_mask=mask.to(device))
+            y_hat_ner, y_hat_cf = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         if args.activation_function == 'softmax':
-            y_pred = torch.argmax(y_hat, 2)
-            preds += y_pred.detach().cpu().numpy().tolist()
+            y_pred_ner = torch.argmax(y_hat_ner, 2)
+            y_pred_cf = torch.argmax(y_hat_cf, 1)
+            matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
+            pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
 
         else:
-            y_pred = model_bert.module.crf.decode(y_hat, mask)
-            preds += y_pred
+            y_pred_ner = model_bert.module.crf.decode(y_hat_ner, mask.cuda())
+            y_pred_cf = torch.argmax(y_hat_cf, 1)
+            matrix_pred += y_pred_ner
+            pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
 
-    index, label = sufprocess(dict_acronyms, data, subwords, preds)
+    index, label = sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf)
 
     df = pd.DataFrame(data={'id': index, 'POI/street': label})
     df.to_csv("data/submission_{}.csv".format(args.activation_function), index=False)

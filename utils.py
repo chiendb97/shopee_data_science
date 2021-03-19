@@ -116,7 +116,9 @@ def preprocess(dict_acronyms, text_word, label_word, pre_start=-1, pre_end=-1):
 
 def convert_lines(data, tokenizer, max_sequence_length):
     index = np.zeros((len(data), max_sequence_length))
-    label = np.zeros((len(data), max_sequence_length))
+    label_ner = np.zeros((len(data), max_sequence_length))
+    label_cf = np.zeros(len(data))
+
     subwords = []
     cls_id = 0
     eos_id = 2
@@ -168,9 +170,15 @@ def convert_lines(data, tokenizer, max_sequence_length):
             lbl = lbl + [0, ] * (max_sequence_length - len(lbl))
 
         index[idx, :] = np.array(input_ids, dtype=np.long)
-        label[idx, :] = np.array(lbl, dtype=np.long)
+        label_ner[idx, :] = np.array(lbl, dtype=np.long)
 
-    return index, label, subwords
+        if poi_start == -1 and street_start == -1:
+            label_cf[idx] = 0
+
+        else:
+            label_cf[idx] = 1
+
+    return index, label_ner, label_cf, subwords
 
 
 def read_csv(path, test=False):

@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--accumulation_steps', type=int, default=5)
+    parser.add_argument('--num_multiply', type=int, default=1)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--seed', type=int, default=69)
     parser.add_argument('--lr', type=float, default=2e-5)
@@ -43,15 +44,16 @@ def main():
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
     config = RobertaConfig.from_pretrained(
         args.model_name,
-        output_hidden_states=True,
-        num_labels=5
+        output_hidden_states=True
     )
 
     model_bert = RobertaForTokenClassification.from_pretrained(args.model_name, config=config,
                                                                activation_function=args.activation_function,
+                                                               num_ner_labels=5,
+                                                               num_cf_labels=2,
                                                                loss_type=args.loss_type)
-    model_bert.cuda()
 
+    model_bert.cuda()
     if torch.cuda.device_count():
         print(f"Training using {torch.cuda.device_count()} gpus")
         model_bert = nn.DataParallel(model_bert)
@@ -69,7 +71,7 @@ def main():
 
     data_train, text_train, label_train, dict_acronyms = read_data(data_train, label_train)
     data_train_ap, text_train_ap, label_train_ap = read_data(data_train_ap, label_train_ap, da=False)
-    data_train_ar, label_train_ar = augment_replace_address(data_train, label_train, num_multiply=5)
+    data_train_ar, label_train_ar = augment_replace_address(data_train, label_train, num_multiply=args.num_multiply)
 
     data_train = data_train + data_train_ap + data_train_ar
     label_train = label_train + label_train_ap + label_train_ar
@@ -80,13 +82,15 @@ def main():
         json.dump(dict_acronyms, f)
 
     print("\nConvert line ...")
-    x_train, y_train, subwords_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
-    x_valid, y_valid, subwords_valid = convert_lines(data_valid, tokenizer, args.max_sequence_length)
+    x_train, y_ner_train, y_cf_train, subwords_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
+    x_valid, y_ner_valid, y_cf_valid, subwords_valid = convert_lines(data_valid, tokenizer, args.max_sequence_length)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
-                                                   torch.tensor(y_train, dtype=torch.long))
+                                                   torch.tensor(y_ner_train, dtype=torch.long),
+                                                   torch.tensor(y_cf_train, dtype=torch.long))
     valid_dataset = torch.utils.data.TensorDataset(torch.tensor(x_valid, dtype=torch.long),
-                                                   torch.tensor(y_valid, dtype=torch.long))
+                                                   torch.tensor(y_ner_valid, dtype=torch.long),
+                                                   torch.tensor(y_cf_valid, dtype=torch.long))
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
@@ -132,9 +136,13 @@ def main():
         optimizer.zero_grad()
         model_bert.train()
         pbar = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
-        for i, (x_batch, y_batch) in pbar:
+        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
             mask = (x_batch != 1)
-            y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch.cuda())
+            y_hat_ner, y_hat_cf, loss_ner, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
+                                                                labels_ner=y_ner_batch.cuda(),
+                                                                labels_cf=y_cf_batch.cuda())
+
+            loss = (loss_ner + loss_cf) / 2
             loss.backward()
             if i % args.accumulation_steps == 0 or i == len(pbar) - 1:
                 optimizer.step()
@@ -143,44 +151,58 @@ def main():
                     scheduler.step()
                 else:
                     scheduler0.step()
-            lossf = loss.item()
-            pbar.set_postfix(loss=lossf)
+
+            pbar.set_postfix(loss_ner=loss_ner.item(), loss_cf=loss_cf.item())
             avg_loss += loss.item() / len(train_loader)
 
-        print("------------------------------- Training epoch {} ----------------------------".format(epoch + 1))
+        print("------------------------------- Training epoch {} -------------------------------".format(epoch + 1))
         print(f"\nTrain avg loss = {avg_loss:.4f}")
 
         model_bert.eval()
         pbar = tqdm(enumerate(valid_loader), total=len(valid_loader), leave=False)
-        output = []
-        preds = []
+        output_ner = []
+        pred_ner = []
+
+        output_cf = []
+        pred_cf = []
         matrix_pred = []
         avg_loss = 0.
 
-        for i, (x_batch, y_batch) in pbar:
+        for i, (x_batch, y_ner_batch, y_cf_batch) in pbar:
             mask = (x_batch != 1)
             with torch.no_grad():
-                y_hat, loss = model_bert(x_batch.cuda(), attention_mask=mask.cuda(), labels=y_batch.cuda())
+                y_hat_ner, y_hat_cf, loss_ner, loss_cf = model_bert(x_batch.cuda(), attention_mask=mask.cuda(),
+                                                                    labels_ner=y_ner_batch.cuda(),
+                                                                    labels_cf=y_cf_batch.cuda())
 
             if args.activation_function == 'softmax':
-                y_pred = torch.argmax(y_hat, 2)
-                matrix_pred += y_pred.detach().cpu().numpy().tolist()
-                output += y_batch[mask].detach().cpu().numpy().tolist()
-                preds += y_pred[mask].detach().cpu().numpy().tolist()
+                y_pred_ner = torch.argmax(y_hat_ner, 2)
+                y_pred_cf = torch.argmax(y_hat_cf, 1)
+                matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
+                output_ner += y_ner_batch[mask].detach().cpu().numpy().tolist()
+                pred_ner += y_pred_ner[mask].detach().cpu().numpy().tolist()
+
+                output_cf += y_cf_batch.detach().cpu().numpy().tolist()
+                pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
 
             else:
-                y_pred = model_bert.module.crf.decode(y_hat, mask.cuda())
-                matrix_pred += y_pred
-                output += y_batch[mask].detach().cpu().numpy().tolist()
-                preds += list(chain.from_iterable(y_pred))
+                y_pred_ner = model_bert.module.crf.decode(y_hat_ner, mask.cuda())
+                y_pred_cf = torch.argmax(y_hat_cf, 1)
+                matrix_pred += y_pred_ner
+                output_ner += y_ner_batch[mask].detach().cpu().numpy().tolist()
+                pred_ner += list(chain.from_iterable(y_pred_ner))
 
-            lossf = loss.item()
-            pbar.set_postfix(loss=lossf)
+                output_cf += y_cf_batch.detach().cpu().numpy().tolist()
+                pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
+
+            loss = (loss_ner + loss_cf) / 2
+            pbar.set_postfix(loss_ner=loss_ner.item(), loss_cf=loss_cf.item())
             avg_loss += loss.item() / len(valid_loader)
 
-        index, label_pred = sufprocess(dict_acronyms, text_valid, subwords_valid, matrix_pred)
+        index, label_pred = sufprocess(dict_acronyms, text_valid, subwords_valid, matrix_pred, pred_cf)
         score = accuracy_score(label_valid, label_pred)
-        precision, recall, f1_score, support = precision_recall_fscore_support(output, preds)
+        score_cf = accuracy_score(output_cf, pred_cf)
+        precision, recall, f1_score, support = precision_recall_fscore_support(output_ner, pred_ner)
         print(f"\nValid avg loss = {avg_loss:.4f}")
         print(f"\nValid accuracy score = {score:.4f}")
         print(f"\nPrecision:", precision)
