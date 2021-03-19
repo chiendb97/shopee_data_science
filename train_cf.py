@@ -188,11 +188,9 @@ def main():
         print(f"\nRecall:", recall)
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
-        if score >= best_score:
-            torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
-            best_score = score
-            df = pd.DataFrame({"address": text_valid, "label": label_valid, "pred": label_pred})
-            df.to_csv("./data/output_{}.csv".format(args.activation_function), index=False)
+        if score_cf >= best_score:
+            torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model_cf.pt"))
+            best_score = score_cf
 
 
 if __name__ == '__main__':
