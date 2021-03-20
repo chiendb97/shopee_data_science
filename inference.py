@@ -140,7 +140,13 @@ def main():
             y_hat_ner = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         if args.activation_function == 'softmax':
+            y_hat_ner = torch.nn.functional.softmax(y_hat_ner)
             y_pred_ner = torch.argmax(y_hat_ner, 2)
+            for i in range(y_pred_ner.shape[0]):
+                for j in range(y_pred_ner.shape[1]):
+                    if y_hat_ner[i][j][y_pred_ner[i][j]] < 0.8:
+                        y_pred_ner[i][j] = 0
+
             matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
 
         else:
