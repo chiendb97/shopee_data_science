@@ -63,8 +63,8 @@ def main():
     print("\nRead data ...")
 
     data_train, label_train = read_csv(args.train_path)
-    data_train, data_valid, label_train, label_valid = train_test_split(data_train, label_train, test_size=0.2,
-                                                                        random_state=42)
+    data_train_tmp, data_valid, label_train_tmp, label_valid = train_test_split(data_train, label_train, test_size=0.2,
+                                                                                random_state=42)
 
     data_train_ap, label_train_ap = augment_punct(data_train, label_train)
 
@@ -190,8 +190,11 @@ def main():
         print(f"\nRecall:", recall)
         print(f"\nF1 score:", f1_score)
         print(f"\nSupport:", support)
+        torch.save(model_bert, os.path.join(args.ckpt_path,
+                                            "model_ner_{}_checkpoint_{}.pt".format(args.activation_function,
+                                                                                   epoch + 1)))
+
         if score_ner >= best_score:
-            torch.save(model_bert, os.path.join(args.ckpt_path, args.activation_function + "_" + "model_ner.pt"))
             best_score = score_ner
             df = pd.DataFrame({"address": text_valid, "label": label_valid, "pred": label_pred})
             df.to_csv("./data/output_{}.csv".format(args.activation_function), index=False)

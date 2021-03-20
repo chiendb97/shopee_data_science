@@ -35,7 +35,7 @@ def make_weights_for_balanced_classes(labels, nclasses):
     for idx, y in enumerate(labels):
         weight[idx] = weight_per_class[y]
 
-    return torch.tensor(weight, dtype=torch.DoubleTensor)
+    return torch.tensor(weight, dtype=torch.float32)
 
 
 def main():
@@ -93,7 +93,7 @@ def main():
                                                    torch.tensor(y_cf_valid, dtype=torch.long))
 
     weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
-    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
+    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, weights.shape[0])
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)

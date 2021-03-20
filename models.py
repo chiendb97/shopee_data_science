@@ -86,7 +86,6 @@ class RobertaForTokenClassification(BertPreTrainedModel):
         else:
             loss_ner = None
             if labels_ner is not None:
-                loss_fct = CrossEntropyLoss()
                 loss_ner = self.crf(emissions=logits_ner, tags=labels_ner, mask=attention_mask, reduction='token_mean')
                 loss_ner = -1.0 * loss_ner
 
