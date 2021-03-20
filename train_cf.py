@@ -16,7 +16,7 @@ from transformers import AdamW
 
 from inference import sufprocess
 from models import RobertaForTokenClassification, RobertaForClassification
-from utils import convert_lines, seed_everything, read_data, accuracy_score, read_csv
+from utils import convert_lines, seed_everything, read_data, accuracy_score, read_csv, convert_lines_cf
 from augment import augment_punct, augment_replace_address
 
 
@@ -29,7 +29,7 @@ def make_weights_for_balanced_classes(labels, nclasses):
 
     N = float(sum(count))
     for i in range(nclasses):
-        weight_per_class[i] = N/float(count[i])
+        weight_per_class[i] = N / float(count[i])
 
     weight = [0] * len(labels)
     for idx, y in enumerate(labels):
@@ -80,22 +80,27 @@ def main():
     data_train, data_valid, label_train, label_valid = train_test_split(data_train, label_train, test_size=0.2,
                                                                         random_state=42)
 
-    data_train, text_train, label_train, dict_acronyms = read_data(data_train, label_train)
-    data_valid, text_valid, label_valid = read_data(data_valid, label_valid, da=False)
+    # data_train, text_train, label_train, dict_acronyms = read_data(data_train, label_train)
+    # data_valid, text_valid, label_valid = read_data(data_valid, label_valid, da=False)
 
     print("\nConvert line ...")
-    x_train, y_ner_train, y_cf_train, subwords_train = convert_lines(data_train, tokenizer, args.max_sequence_length)
-    x_valid, y_ner_valid, y_cf_valid, subwords_valid = convert_lines(data_valid, tokenizer, args.max_sequence_length)
+    x_train, y_cf_train = convert_lines_cf(data_train, tokenizer, label_train,
+                                           args.max_sequence_length)
+    x_valid, y_cf_valid = convert_lines_cf(data_valid, tokenizer, label_valid,
+                                           args.max_sequence_length)
+
+    x_train = torch.cat((x_train, x_train[y_cf_train == 0].repeat(5, 1)))
+    y_cf_train = torch.cat((y_cf_train, y_cf_train[y_cf_train == 0].repeat(5)))
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
                                                    torch.tensor(y_cf_train, dtype=torch.long))
     valid_dataset = torch.utils.data.TensorDataset(torch.tensor(x_valid, dtype=torch.long),
                                                    torch.tensor(y_cf_valid, dtype=torch.long))
 
-    weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
-    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, weights.shape[0])
+    # weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
+    # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, weights.shape[0])
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Creating optimizer and lr schedulers
@@ -164,7 +169,6 @@ def main():
 
         output_cf = []
         pred_cf = []
-
         avg_loss = 0.
 
         for i, (x_batch, y_cf_batch) in pbar:

@@ -250,6 +250,42 @@ def read_data(text, label, da=True):
     return format_data, raw_data, raw_label
 
 
+def convert_lines_cf(data, tokenizer, label=None, max_sequence_length=64):
+    index = np.zeros((len(data), max_sequence_length))
+    label_cf = np.zeros(len(data))
+
+    subwords = []
+    cls_id = 0
+    eos_id = 2
+    pad_id = 1
+
+    for idx, address in tqdm(enumerate(data), total=len(data)):
+        address = address.replace(",", "")
+        address_word = format_punctuatation(address)
+        address = " " + " ".join(address_word)
+        input_ids = tokenizer(address)['input_ids']
+        subword = tokenizer.convert_ids_to_tokens(input_ids)
+        subwords.append(subword)
+
+        if len(input_ids) > max_sequence_length:
+            input_ids = input_ids[:max_sequence_length]
+            input_ids[-1] = eos_id
+        else:
+            input_ids = input_ids + [pad_id, ] * (max_sequence_length - len(input_ids))
+
+        index[idx, :] = np.array(input_ids, dtype=np.long)
+        if label is not None:
+            if label[idx].strip() == "/":
+                label_cf[idx] = 0
+            else:
+                label_cf[idx] = 1
+
+    if label is not None:
+        return index, label_cf
+
+    return index
+
+
 def seed_everything(SEED):
     np.random.seed(SEED)
     torch.manual_seed(SEED)
