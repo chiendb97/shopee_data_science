@@ -92,10 +92,8 @@ def main():
     x_train = torch.cat((x_train, x_train[y_cf_train == 0].repeat(5, 1)))
     y_cf_train = torch.cat((y_cf_train, y_cf_train[y_cf_train == 0].repeat(5)))
 
-    train_dataset = torch.utils.data.TensorDataset(torch.tensor(x_train, dtype=torch.long),
-                                                   torch.tensor(y_cf_train, dtype=torch.long))
-    valid_dataset = torch.utils.data.TensorDataset(torch.tensor(x_valid, dtype=torch.long),
-                                                   torch.tensor(y_cf_valid, dtype=torch.long))
+    train_dataset = torch.utils.data.TensorDataset(x_train, y_cf_train)
+    valid_dataset = torch.utils.data.TensorDataset(x_valid, y_cf_valid)
 
     # weights = make_weights_for_balanced_classes(torch.tensor(y_cf_train, dtype=torch.long), 2)
     # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, weights.shape[0])

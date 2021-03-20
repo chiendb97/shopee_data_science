@@ -281,9 +281,9 @@ def convert_lines_cf(data, tokenizer, label=None, max_sequence_length=64):
                 label_cf[idx] = 1
 
     if label is not None:
-        return index, label_cf
+        return torch.tensor(index, dtype=torch.long), torch.tensor(label_cf, dtype=torch.long)
 
-    return index
+    return torch.tensor(index, dtype=torch.long)
 
 
 def seed_everything(SEED):
