@@ -98,16 +98,6 @@ def sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf=None):
 
         label.append(poi + "/" + street)
 
-        # print("address:", address)
-        # print("pred:", pred)
-        # if poi_start >= 0:
-        #     print("poi:", address[poi_start: poi_end])
-        #
-        # if street_start >= 0:
-        #     print("street:", address[street_start: street_end])
-        #
-        # print("------------------------------------------------------")
-
     return index, label
 
 
@@ -116,6 +106,7 @@ def main():
     parser.add_argument('--test_path', type=str, default='./data/test.csv')
     parser.add_argument('--dict_acronyms_path', type=str, default='./data/dict_acronyms.json')
     parser.add_argument('--model_name', type=str, default='cahya/roberta-base-indonesian-522M')
+    parser.add_argument('--model_path', type=str, default='./data/model.pt')
     parser.add_argument('--activation_function', type=str, default='softmax')
     parser.add_argument('--max_sequence_length', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=32)
@@ -142,26 +133,21 @@ def main():
     model_bert.eval()
 
     matrix_pred = []
-    pred_cf = []
     pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
     for i, (x_batch,) in pbar:
         mask = (x_batch != 1)
         with torch.no_grad():
-            y_hat_ner, y_hat_cf = model_bert(x_batch.to(device), attention_mask=mask.to(device))
+            y_hat_ner = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         if args.activation_function == 'softmax':
             y_pred_ner = torch.argmax(y_hat_ner, 2)
-            y_pred_cf = torch.argmax(y_hat_cf, 1)
             matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
-            pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
 
         else:
             y_pred_ner = model_bert.module.crf.decode(y_hat_ner, mask.cuda())
-            y_pred_cf = torch.argmax(y_hat_cf, 1)
             matrix_pred += y_pred_ner
-            pred_cf += y_pred_cf.detach().cpu().numpy().tolist()
 
-    index, label = sufprocess(dict_acronyms, data, subwords, matrix_pred, pred_cf)
+    index, label = sufprocess(dict_acronyms, data, subwords, matrix_pred, None)
 
     df = pd.DataFrame(data={'id': index, 'POI/street': label})
     df.to_csv("data/submission_{}.csv".format(args.activation_function), index=False)
