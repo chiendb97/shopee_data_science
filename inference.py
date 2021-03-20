@@ -122,7 +122,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     tokenizer = RobertaTokenizer.from_pretrained(args.model_name)
-    model_bert = torch.load(os.path.join(args.ckpt_path, args.activation_function + "_" + "model.pt"))
+    model_bert = torch.load(args.model_path)
     model_bert.to(device)
     data = read_csv(args.test_path, test=True)
     index, subwords = text_to_index(data, tokenizer, args.max_sequence_length)
