@@ -132,6 +132,7 @@ def main():
 
     model_bert.eval()
 
+    matrix_pred_trick = []
     matrix_pred = []
     pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
     for i, (x_batch,) in pbar:
@@ -140,20 +141,26 @@ def main():
             y_hat_ner = model_bert(x_batch.to(device), attention_mask=mask.to(device))
 
         if args.activation_function == 'softmax':
-            y_hat_ner = torch.nn.functional.softmax(y_hat_ner)
+            y_hat_ner = torch.nn.functional.softmax(y_hat_ner, 2)
             y_pred_ner = torch.argmax(y_hat_ner, 2)
+            matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
             for i in range(y_pred_ner.shape[0]):
                 for j in range(y_pred_ner.shape[1]):
                     if y_hat_ner[i][j][y_pred_ner[i][j]] < 0.8:
                         y_pred_ner[i][j] = 0
 
-            matrix_pred += y_pred_ner.detach().cpu().numpy().tolist()
+            matrix_pred_trick += y_pred_ner.detach().cpu().numpy().tolist()
 
         else:
             y_pred_ner = model_bert.module.crf.decode(y_hat_ner, mask.cuda())
             matrix_pred += y_pred_ner
 
     index, label = sufprocess(dict_acronyms, data, subwords, matrix_pred, None)
+    index, label_trick = sufprocess(dict_acronyms, data, subwords, matrix_pred, None)
+
+    for i in len(label):
+        if label_trick[i] == "/":
+            label[i] = "/"
 
     df = pd.DataFrame(data={'id': index, 'POI/street': label})
     df.to_csv("data/submission_{}.csv".format(args.activation_function), index=False)
